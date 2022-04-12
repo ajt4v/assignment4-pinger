@@ -5,6 +5,7 @@ import struct
 import time
 import select
 import binascii
+import statistics
 # Should use stdev
 
 ICMP_ECHO_REQUEST = 8
@@ -32,7 +33,9 @@ def checksum(string):
     answer = answer >> 8 | (answer << 8 & 0xff00)
     return answer
 
-
+def unpack_helper(fmt, data):
+    size = struct.calcsize(fmt)
+    return struct.unpack(fmt, data[:size])
 
 def receiveOnePing(mySocket, ID, timeout, destAddr):
     timeLeft = timeout
@@ -48,13 +51,37 @@ def receiveOnePing(mySocket, ID, timeout, destAddr):
         recPacket, addr = mySocket.recvfrom(1024)
 
         # Fill in start
+        #verify packet typ 0
+        #verify ID is same as ID sent
+        #calculate data = timeReceived - timesent(data)
+        #recpacketUnpacked = unpack_helper('bbHHh', recPacket)
+                
+        recvdHeader = unpack_helper("bbHHh", recPacket[20:])
+        timeSent = unpack_helper("d", recPacket[20:])[0]
+        recvdType = recvdHeader[0]
+        recvdID = recvdHeader[3]
+        
+        data = 0
+        if recvdType == 0 and recvdID == ID:
+            data = timeReceived - timeSent
+        
+        #print(data)
 
+
+
+            
+            
+        
+        
+        
         # Fetch the ICMP header from the IP packet
 
         # Fill in end
         timeLeft = timeLeft - howLongInSelect
         if timeLeft <= 0:
             return "Request timed out."
+        else:
+            return data
 
 
 def sendOnePing(mySocket, destAddr, ID):
@@ -109,15 +136,21 @@ def ping(host, timeout=1):
     
     #Send ping requests to a server separated by approximately one second
     #Add something here to collect the delays of each ping in a list so you can calculate vars after your ping
-    
+    delayList = []
     for i in range(0,4): #Four pings will be sent (loop runs for i=0, 1, 2, 3)
         delay = doOnePing(dest, timeout)
+        delayList.append(delay)
         print(delay)
         time.sleep(1)  # one second
         
     #You should have the values of delay for each ping here; fill in calculation for packet_min, packet_avg, packet_max, and stdev
-    #vars = [str(round(packet_min, 8)), str(round(packet_avg, 8)), str(round(packet_max, 8)),str(round(stdev(stdev_var), 8))]
-
+    print(delayList)
+    packet_min = min(delayList)
+    packet_avg = statistics.mean(delayList)
+    packet_max = max(delayList)
+    stdev_var = statistics.stdev(delayList)
+    vars = [str(round(packet_min, 8)), str(round(packet_avg, 8)), str(round(packet_max, 8)),str(round(stdev_var, 8))]
+    
     return vars
 
 if __name__ == '__main__':
